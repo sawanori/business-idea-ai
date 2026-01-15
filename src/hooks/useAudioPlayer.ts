@@ -9,6 +9,7 @@ interface UseAudioPlayerReturn {
   play: (audioContent: string) => Promise<void>;
   stop: () => void;
   canAutoPlay: boolean;
+  initAudioContext: () => void;
 }
 
 export const useAudioPlayer = (): UseAudioPlayerReturn => {
@@ -117,5 +118,5 @@ export const useAudioPlayer = (): UseAudioPlayerReturn => {
     }
   }, []);
 
-  return { isPlaying, isLoading, error, play, stop, canAutoPlay };
+  return { isPlaying, isLoading, error, play, stop, canAutoPlay, initAudioContext };
 };

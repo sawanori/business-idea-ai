@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useChat } from '@/hooks/useChat';
@@ -15,6 +15,7 @@ export default function ChatPage() {
   const { messages, isLoading, error, sendMessage, clearSession, generateSummary } = useChat();
   const [lastAudioContent, setLastAudioContent] = useState<string | null>(null);
   const [isTTSEnabled, setIsTTSEnabled] = useState(true);
+  const [audioInitFn, setAudioInitFn] = useState<(() => void) | null>(null);
 
   // 最新のアシスタントメッセージをTTSで再生
   useEffect(() => {
@@ -29,6 +30,14 @@ export default function ChatPage() {
         });
     }
   }, [messages, isTTSEnabled]);
+
+  const handleAudioInit = useCallback((initFn: () => void) => {
+    setAudioInitFn(() => initFn);
+  }, []);
+
+  const handleRecordingStart = () => {
+    audioInitFn?.();
+  };
 
   const handleTranscript = async (text: string) => {
     setLastAudioContent(null);
@@ -120,11 +129,11 @@ export default function ChatPage() {
       <footer className="flex-shrink-0 bg-white border-t border-slate-200 px-4 py-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-4">
-            <VoiceInput onTranscript={handleTranscript} disabled={isLoading} />
+            <VoiceInput onTranscript={handleTranscript} disabled={isLoading} onRecordingStart={handleRecordingStart} />
             
             {/* 音声再生ボタン */}
             {lastAudioContent && (
-              <AudioPlayer audioContent={lastAudioContent} autoPlay={isTTSEnabled} />
+              <AudioPlayer audioContent={lastAudioContent} autoPlay={isTTSEnabled} onInit={handleAudioInit} />
             )}
           </div>
         </div>

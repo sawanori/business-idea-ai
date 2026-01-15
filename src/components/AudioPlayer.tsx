@@ -7,10 +7,18 @@ import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 interface AudioPlayerProps {
   audioContent: string | null;
   autoPlay?: boolean;
+  onInit?: (initFn: () => void) => void;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioContent, autoPlay = true }) => {
-  const { isPlaying, isLoading, error, play, stop, canAutoPlay } = useAudioPlayer();
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioContent, autoPlay = true, onInit }) => {
+  const { isPlaying, isLoading, error, play, stop, canAutoPlay, initAudioContext } = useAudioPlayer();
+
+  // 親コンポーネントに initAudioContext を渡す
+  useEffect(() => {
+    if (onInit) {
+      onInit(initAudioContext);
+    }
+  }, [onInit, initAudioContext]);
 
   const handlePlay = () => {
     if (audioContent) {

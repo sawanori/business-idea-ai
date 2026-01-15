@@ -8,9 +8,10 @@ import { speechToText } from '@/lib/speech';
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
   disabled?: boolean;
+  onRecordingStart?: () => void;
 }
 
-export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled = false }) => {
+export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled = false, onRecordingStart }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -27,6 +28,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
     setErrorMessage(null);
     try {
       await startRecording();
+      // 録音開始成功時にコールバック実行
+      onRecordingStart?.();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '録音開始に失敗しました');
     }
