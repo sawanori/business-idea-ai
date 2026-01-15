@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useChat } from '@/hooks/useChat';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
-import { VoiceInput } from '@/components/VoiceInput';
+import { VoiceInput, VoiceInputHandle } from '@/components/VoiceInput';
 import { ChatInterface } from '@/components/ChatInterface';
 import { AudioPlayer } from '@/components/AudioPlayer';
 import { ObsidianSaveButton } from '@/components/ObsidianSaveButton';
@@ -16,6 +16,38 @@ export default function ChatPage() {
   const [lastAudioContent, setLastAudioContent] = useState<string | null>(null);
   const [isTTSEnabled, setIsTTSEnabled] = useState(true);
   const [audioInitFn, setAudioInitFn] = useState<(() => void) | null>(null);
+  const voiceInputRef = useRef<VoiceInputHandle>(null);
+
+  // Request microphone permission on mount
+  useEffect(() => {
+    let isMounted = true;
+    
+    const requestMicPermission = async () => {
+      if (!voiceInputRef.current) {
+        console.error('VoiceInput ref is null during mount');
+        return;
+      }
+      
+      try {
+        const granted = await voiceInputRef.current.requestPermission();
+        if (isMounted && !granted) {
+          // Permission denied - user can retry by pressing record button
+          console.info('Microphone permission not granted on initial load');
+        }
+      } catch (err) {
+        // Some browsers (Safari) may block permission request without user gesture
+        if (isMounted) {
+          console.info('Could not pre-request microphone permission:', err);
+        }
+      }
+    };
+    
+    requestMicPermission();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // 最新のアシスタントメッセージをTTSで再生
   useEffect(() => {
@@ -129,7 +161,7 @@ export default function ChatPage() {
       <footer className="flex-shrink-0 bg-white border-t border-slate-200 px-4 py-6">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-4">
-            <VoiceInput onTranscript={handleTranscript} disabled={isLoading} onRecordingStart={handleRecordingStart} />
+            <VoiceInput ref={voiceInputRef} onTranscript={handleTranscript} disabled={isLoading} onRecordingStart={handleRecordingStart} />
             
             {/* 音声再生ボタン */}
             {lastAudioContent && (

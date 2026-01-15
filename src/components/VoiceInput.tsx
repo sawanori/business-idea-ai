@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useImperativeHandle, forwardRef } from 'react';
 import { motion } from 'framer-motion';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { speechToText } from '@/lib/speech';
+
+export interface VoiceInputHandle {
+  requestPermission: () => Promise<boolean>;
+}
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -11,15 +15,20 @@ interface VoiceInputProps {
   onRecordingStart?: () => void;
 }
 
-export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled = false, onRecordingStart }) => {
+export const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
+  ({ onTranscript, disabled = false, onRecordingStart }, ref) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { isRecording, mimeType, startRecording, stopRecording, error: recorderError } = useVoiceRecorder({
+  const { isRecording, mimeType, startRecording, stopRecording, requestPermission, error: recorderError } = useVoiceRecorder({
     onTimeout: () => {
       setErrorMessage('録音時間が上限に達しました（60秒）');
     },
   });
+
+  useImperativeHandle(ref, () => ({
+    requestPermission,
+  }), [requestPermission]);
 
   const handleStartRecording = async () => {
     // Guard clause: prevent start if disabled, processing, or already recording
@@ -141,4 +150,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
       )}
     </div>
   );
-};
+});
+
+VoiceInput.displayName = 'VoiceInput';

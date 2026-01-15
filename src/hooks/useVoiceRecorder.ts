@@ -28,6 +28,7 @@ interface UseVoiceRecorderReturn {
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<{ blob: Blob; mimeType: string } | null>;
   releaseStream: () => void;
+  requestPermission: () => Promise<boolean>;
   error: string | null;
 }
 
@@ -66,6 +67,18 @@ export const useVoiceRecorder = (
     streamRef.current = stream;
     return stream;
   }, []);
+
+  const requestPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      setError(null);
+      await getOrCreateStream();
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'マイクへのアクセスが拒否されました';
+      setError(message);
+      return false;
+    }
+  }, [getOrCreateStream]);
 
   const stopRecording = useCallback((): Promise<{ blob: Blob; mimeType: string } | null> => {
     return new Promise((resolve) => {
@@ -138,5 +151,5 @@ export const useVoiceRecorder = (
     }
   }, []);
 
-  return { isRecording, mimeType, startRecording, stopRecording, releaseStream, error };
+  return { isRecording, mimeType, startRecording, stopRecording, releaseStream, requestPermission, error };
 };
