@@ -208,7 +208,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     <>
       {/* コンパクトモード: アイコンのみ表示 */}
       {compact ? (
-        <motion.button
+        <button
           onClick={handleSaveToObsidian}
           disabled={disabled || isEmpty || isSaving}
           className={`
@@ -219,7 +219,6 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
               : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
             }
           `}
-          whileTap={!(isEmpty || disabled || isSaving) ? { scale: 0.98 } : undefined}
           aria-label="Obsidianに保存"
           title={isEmpty ? '保存する内容がありません' : 'Obsidianに保存'}
           data-compact="true"
@@ -235,7 +234,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
               <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
             </svg>
           )}
-        </motion.button>
+        </button>
       ) : (
         /* 通常モード: フル機能表示 */
         <div className="flex flex-col gap-2">
