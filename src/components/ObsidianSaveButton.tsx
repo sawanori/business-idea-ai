@@ -1,0 +1,242 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName } from '@/lib/obsidian';
+
+interface ObsidianSaveButtonProps {
+  content: string;
+  fileName?: string;
+  vaultName?: string;
+  disabled?: boolean;
+  compact?: boolean;
+}
+
+type MessageType = 'success' | 'warning' | 'error' | null;
+
+export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
+  content,
+  fileName = 'idea',
+  vaultName,
+  disabled = false,
+  compact = false,
+}) => {
+  const [showOptions, setShowOptions] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: MessageType } | null>(null);
+
+  const vault = vaultName || getDefaultVaultName();
+
+  const handleSaveToObsidian = async () => {
+    if (!content.trim()) {
+      setMessage({ text: '保存する内容がありません', type: 'error' });
+      return;
+    }
+
+    if (!vault) {
+      setMessage({ text: 'Vault名が設定されていません', type: 'error' });
+      setShowOptions(true);
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage(null);
+
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      const fullFileName = `${fileName}-${date}.md`;
+      const result = generateObsidianUri(vault, fullFileName, content);
+
+      if (result.truncated) {
+        setMessage({
+          text: `内容が長すぎます（${result.originalLength}文字）。代わりにMarkdownファイルをダウンロードしてください。`,
+          type: 'warning',
+        });
+        setShowOptions(true);
+      } else {
+        openObsidianUri(result.uri);
+        setMessage({ text: 'Obsidianで開きました', type: 'success' });
+        setTimeout(() => setMessage(null), 3000);
+      }
+    } catch (err) {
+      setMessage({
+        text: err instanceof Error ? err.message : '保存に失敗しました',
+        type: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!content.trim()) {
+      setMessage({ text: 'ダウンロードする内容がありません', type: 'error' });
+      return;
+    }
+
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      const fullFileName = `${fileName}-${date}`;
+      downloadAsMarkdown(fullFileName, content);
+      setMessage({ text: 'ダウンロードしました', type: 'success' });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setMessage({
+        text: err instanceof Error ? err.message : 'ダウンロードに失敗しました',
+        type: 'error',
+      });
+    }
+  };
+
+  const isEmpty = !content.trim();
+
+  // コンパクトモード: アイコンのみ表示
+  if (compact) {
+    return (
+      <motion.button
+        onClick={handleSaveToObsidian}
+        disabled={disabled || isEmpty || isSaving}
+        className={`
+          p-3 rounded-lg transition-colors min-w-[44px] min-h-[44px]
+          flex items-center justify-center
+          ${isEmpty || disabled
+            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+          }
+        `}
+        whileTap={isEmpty || disabled ? {} : { scale: 0.98 }}
+        aria-label="Obsidianに保存"
+        title={isEmpty ? '保存する内容がありません' : 'Obsidianに保存'}
+        data-compact="true"
+      >
+        {isSaving ? (
+          <motion.div
+            className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          />
+        ) : (
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+          </svg>
+        )}
+      </motion.button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <motion.button
+          onClick={handleSaveToObsidian}
+          disabled={disabled || isEmpty || isSaving}
+          className={`
+            flex-1 px-6 py-3 rounded-lg font-medium
+            transition-all duration-200 shadow-md
+            ${isEmpty || disabled
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700'
+            }
+          `}
+          whileTap={isEmpty || disabled ? {} : { scale: 0.98 }}
+          aria-label="Obsidianに保存"
+        >
+          {isSaving ? (
+            <span className="flex items-center justify-center gap-2">
+              <motion.div
+                className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+              />
+              保存中...
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+              </svg>
+              Obsidianに保存
+            </span>
+          )}
+        </motion.button>
+
+        <button
+          onClick={() => setShowOptions(!showOptions)}
+          className="p-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+          aria-label="その他のオプション"
+        >
+          <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* オプションメニュー */}
+      <AnimatePresence>
+        {showOptions && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+              <button
+                onClick={handleDownloadMarkdown}
+                disabled={isEmpty}
+                className={`
+                  w-full px-4 py-2 rounded-md font-medium text-sm
+                  transition-colors
+                  ${isEmpty
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                  }
+                `}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                  </svg>
+                  Markdownファイルをダウンロード
+                </span>
+              </button>
+
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>
+                  <strong>Obsidian Advanced URI プラグインが必要です</strong>
+                </p>
+                <a
+                  href="https://github.com/Vinzent03/obsidian-advanced-uri"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 hover:underline"
+                >
+                  インストールガイドを見る →
+                </a>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* フィードバックメッセージ */}
+      <AnimatePresence>
+        {message && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`
+              px-4 py-2 rounded-md text-sm font-medium
+              ${message.type === 'success' && 'bg-green-100 text-green-800'}
+              ${message.type === 'warning' && 'bg-yellow-100 text-yellow-800'}
+              ${message.type === 'error' && 'bg-red-100 text-red-800'}
+            `}
+          >
+            {message.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
