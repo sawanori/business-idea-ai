@@ -20,31 +20,38 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
     },
   });
 
-  const handleToggleRecording = async () => {
-    setErrorMessage(null);
+  const handleStartRecording = async () => {
+    // Guard clause: prevent start if disabled, processing, or already recording
+    if (disabled || isProcessing || isRecording) return;
 
-    if (isRecording) {
-      // 録音停止 → STT処理
-      setIsProcessing(true);
-      try {
-        const result = await stopRecording();
-        if (result) {
-          const { blob, mimeType: recordedMimeType } = result;
-          const sttResult = await speechToText(blob, recordedMimeType);
-          if (sttResult.transcript) {
-            onTranscript(sttResult.transcript);
-          } else {
-            setErrorMessage('音声を認識できませんでした');
-          }
-        }
-      } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : '音声処理に失敗しました');
-      } finally {
-        setIsProcessing(false);
-      }
-    } else {
-      // 録音開始
+    setErrorMessage(null);
+    try {
       await startRecording();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '録音開始に失敗しました');
+    }
+  };
+
+  const handleStopRecording = async () => {
+    // Guard clause: only process if currently recording and not disabled
+    if (disabled || !isRecording) return;
+
+    setIsProcessing(true);
+    try {
+      const result = await stopRecording();
+      if (result) {
+        const { blob, mimeType: recordedMimeType } = result;
+        const sttResult = await speechToText(blob, recordedMimeType);
+        if (sttResult.transcript) {
+          onTranscript(sttResult.transcript);
+        } else {
+          setErrorMessage('音声を認識できませんでした');
+        }
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '音声処理に失敗しました');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -53,19 +60,30 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
   return (
     <div className="flex flex-col items-center gap-3">
       <motion.button
-        onClick={handleToggleRecording}
+        onMouseDown={handleStartRecording}
+        onMouseUp={handleStopRecording}
+        onMouseLeave={handleStopRecording}
+        onTouchStart={(e) => {
+          e.preventDefault();
+          handleStartRecording();
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          handleStopRecording();
+        }}
+        onTouchCancel={handleStopRecording}
         disabled={disabled || isProcessing}
         className={`
           relative w-20 h-20 rounded-full flex items-center justify-center
           transition-all duration-300 shadow-lg
-          ${isRecording 
-            ? 'bg-red-500 hover:bg-red-600' 
+          ${isRecording
+            ? 'bg-red-500 hover:bg-red-600'
             : 'bg-gradient-to-br from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700'
           }
           ${(disabled || isProcessing) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         `}
         whileTap={{ scale: 0.95 }}
-        aria-label={isRecording ? '録音停止' : '録音開始'}
+        aria-label={isRecording ? '録音中' : '押して話す'}
       >
         {isProcessing ? (
           <motion.div
@@ -102,7 +120,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
 
       {/* ステータステキスト */}
       <p className="text-sm text-gray-500">
-        {isProcessing ? '音声を処理中...' : isRecording ? '録音中...' : 'タップして話す'}
+        {isProcessing ? '音声を処理中...' : isRecording ? '録音中...' : '押して話す'}
       </p>
 
       {/* エラーメッセージ */}
