@@ -1,17 +1,29 @@
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { NextRequest, NextResponse } from 'next/server';
 import { TTSRequest, TTSResponse, ErrorResponse } from '@/types/api';
+import * as fs from 'fs';
 
 const MAX_TEXT_LENGTH = 5000;
 
 let client: TextToSpeechClient | null = null;
+
+function parseCredentials(credentials: string) {
+  // JSON文字列かファイルパスかを判別
+  if (credentials.trim().startsWith('{')) {
+    return JSON.parse(credentials);
+  } else {
+    // ファイルパスとして読み込み
+    const fileContent = fs.readFileSync(credentials, 'utf-8');
+    return JSON.parse(fileContent);
+  }
+}
 
 function getClient() {
   if (!client) {
     const credentials = process.env.GOOGLE_CLOUD_CREDENTIALS;
     if (credentials) {
       client = new TextToSpeechClient({
-        credentials: JSON.parse(credentials),
+        credentials: parseCredentials(credentials),
       });
     } else {
       client = new TextToSpeechClient();

@@ -1,17 +1,29 @@
 import { SpeechClient } from '@google-cloud/speech';
 import { NextRequest, NextResponse } from 'next/server';
 import { STTRequest, STTResponse, ErrorResponse } from '@/types/api';
+import * as fs from 'fs';
 
 const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB
 
 let client: SpeechClient | null = null;
+
+function parseCredentials(credentials: string) {
+  // JSON文字列かファイルパスかを判別
+  if (credentials.trim().startsWith('{')) {
+    return JSON.parse(credentials);
+  } else {
+    // ファイルパスとして読み込み
+    const fileContent = fs.readFileSync(credentials, 'utf-8');
+    return JSON.parse(fileContent);
+  }
+}
 
 function getClient() {
   if (!client) {
     const credentials = process.env.GOOGLE_CLOUD_CREDENTIALS;
     if (credentials) {
       client = new SpeechClient({
-        credentials: JSON.parse(credentials),
+        credentials: parseCredentials(credentials),
       });
     } else {
       client = new SpeechClient();
