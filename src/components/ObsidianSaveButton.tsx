@@ -125,7 +125,22 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     setMessage({ text: 'キーワードを抽出中...', type: null });
 
     try {
-      const processed = await processWithKeywordLinks(content);
+      // タイムアウト付きでキーワード処理を試みる
+      let processed: string;
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 5000)
+        );
+        processed = await Promise.race([
+          processWithKeywordLinks(content),
+          timeoutPromise
+        ]);
+      } catch {
+        // キーワード処理が失敗またはタイムアウトした場合、元のコンテンツを使用
+        console.log('キーワード処理をスキップ、元のコンテンツを使用');
+        processed = content;
+      }
+
       setProcessedContent(processed);
 
       if (type === 'obsidian') {
@@ -141,10 +156,12 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
       setIsPreviewOpen(true);
       setMessage(null);
     } catch (err) {
-      setMessage({
-        text: err instanceof Error ? err.message : 'キーワード処理に失敗しました',
-        type: 'error',
-      });
+      // それでも失敗した場合、元のコンテンツでモーダルを表示
+      console.error('保存準備エラー:', err);
+      setProcessedContent(content);
+      setIsContentTooLong(false);
+      setIsPreviewOpen(true);
+      setMessage(null);
     } finally {
       setIsSaving(false);
     }
