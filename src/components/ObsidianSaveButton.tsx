@@ -39,6 +39,8 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
 
   // 処理中フラグ（二重クリック防止）
   const isProcessingRef = useRef(false);
+  // タッチイベント後のクリック抑制用
+  const touchHandledRef = useRef(false);
 
   const vault = vaultName || getDefaultVaultName();
 
@@ -182,25 +184,58 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     }
   }, [content, vault, fileName]);
 
-  const handleSaveToObsidian = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
-    // イベントのデフォルト動作を防止
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
+  // クリックイベントハンドラ（マウスクリック用）
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // タッチイベントで既に処理済みの場合はスキップ
+    if (touchHandledRef.current) {
+      console.log('ObsidianSaveButton: Click skipped (touch already handled)');
+      touchHandledRef.current = false;
+      return;
     }
+
+    e.preventDefault();
+    e.stopPropagation();
 
     const isContentEmpty = !content.trim();
 
-    console.log('ObsidianSaveButton: handleSaveToObsidian called', {
+    console.log('ObsidianSaveButton: handleClick called', {
       isEmpty: isContentEmpty,
       disabled,
       isSaving,
       isProcessing: isProcessingRef.current,
-      contentLength: content.length,
-      eventType: e?.type
+      contentLength: content.length
     });
 
-    // 早期リターンチェック
+    if (isContentEmpty || disabled || isSaving || isProcessingRef.current) {
+      console.log('ObsidianSaveButton: Early return due to state check');
+      return;
+    }
+
+    handlePrepareContent('obsidian');
+  }, [content, disabled, isSaving, handlePrepareContent]);
+
+  // タッチイベントハンドラ（モバイル用）
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // タッチ処理済みフラグを立てる（後続のclickイベントを抑制）
+    touchHandledRef.current = true;
+    // 300ms後にリセット
+    setTimeout(() => {
+      touchHandledRef.current = false;
+    }, 300);
+
+    const isContentEmpty = !content.trim();
+
+    console.log('ObsidianSaveButton: handleTouchEnd called', {
+      isEmpty: isContentEmpty,
+      disabled,
+      isSaving,
+      isProcessing: isProcessingRef.current,
+      contentLength: content.length
+    });
+
     if (isContentEmpty || disabled || isSaving || isProcessingRef.current) {
       console.log('ObsidianSaveButton: Early return due to state check');
       return;
@@ -258,9 +293,9 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
       {/* コンパクトモード: アイコンのみ表示 */}
       {compact ? (
         <button
-          onClick={handleSaveToObsidian}
-          onTouchEnd={handleSaveToObsidian}
-          disabled={disabled || isEmpty || isSaving || isProcessingRef.current}
+          onClick={handleClick}
+          onTouchEnd={handleTouchEnd}
+          disabled={disabled || isEmpty || isSaving}
           className={`
             p-3 rounded-lg transition-colors min-w-[44px] min-h-[44px]
             flex items-center justify-center select-none
@@ -293,7 +328,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <motion.button
-              onClick={handleSaveToObsidian}
+              onClick={handleClick}
               disabled={disabled || isEmpty || isSaving}
               className={`
                 flex-1 px-6 py-3 rounded-lg font-medium
