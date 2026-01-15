@@ -133,7 +133,7 @@ export default function ChatPage() {
             
             {/* 音声再生ボタン */}
             {lastAudioContent && (
-              <AudioPlayer audioContent={lastAudioContent} autoPlay={isTTSEnabled} onInit={handleAudioInit} />
+              <AudioPlayer audioContent={lastAudioContent} autoPlay={isTTSEnabled} onInit={handleAudioInit} className="hidden" />
             )}
           </div>
         </div>

@@ -5,12 +5,13 @@ import { motion } from 'framer-motion';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 
 interface AudioPlayerProps {
+  className?: string;
   audioContent: string | null;
   autoPlay?: boolean;
   onInit?: (initFn: () => void) => void;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioContent, autoPlay = true, onInit }) => {
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioContent, autoPlay = true, onInit, className }) => {
   const { isPlaying, isLoading, error, play, stop, canAutoPlay, initAudioContext } = useAudioPlayer();
 
   // 親コンポーネントに initAudioContext を渡す
@@ -40,7 +41,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ audioContent, autoPlay
   if (!audioContent) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 ${className || ""}`}>
       <motion.button
         onClick={handlePlay}
         disabled={isLoading}
