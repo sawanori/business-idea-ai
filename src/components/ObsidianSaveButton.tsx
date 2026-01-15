@@ -150,8 +150,20 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     }
   };
 
-  const handleSaveToObsidian = () => handlePrepareContent('obsidian');
-  const handleDownloadMarkdown = () => handlePrepareContent('download');
+  const handleSaveToObsidian = () => {
+    console.log('ObsidianSaveButton: handleSaveToObsidian called', {
+      isEmpty,
+      disabled,
+      isSaving,
+      contentLength: content.length
+    });
+    handlePrepareContent('obsidian');
+  };
+
+  const handleDownloadMarkdown = () => {
+    console.log('ObsidianSaveButton: handleDownloadMarkdown called');
+    handlePrepareContent('download');
+  };
 
   // モーダルの保存ボタン押下時の処理
   const handleConfirmSave = () => {
@@ -207,7 +219,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
               : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
             }
           `}
-          whileTap={isEmpty || disabled ? {} : { scale: 0.98 }}
+          whileTap={!(isEmpty || disabled || isSaving) ? { scale: 0.98 } : undefined}
           aria-label="Obsidianに保存"
           title={isEmpty ? '保存する内容がありません' : 'Obsidianに保存'}
           data-compact="true"
@@ -239,7 +251,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
                   : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700'
                 }
               `}
-              whileTap={isEmpty || disabled ? {} : { scale: 0.98 }}
+              whileTap={!(isEmpty || disabled || isSaving) ? { scale: 0.98 } : undefined}
               aria-label="Obsidianに保存"
             >
               {isSaving ? (
