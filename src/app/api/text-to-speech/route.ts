@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     const {
       text,
       languageCode = process.env.TTS_LANGUAGE_CODE || 'ja-JP',
-      voiceName = process.env.TTS_VOICE_NAME || 'ja-JP-Neural2-D',
+      voiceName = process.env.TTS_VOICE_NAME || 'ja-JP-Wavenet-D',
     } = body;
 
     if (!text) {
@@ -72,7 +72,11 @@ export async function POST(req: NextRequest) {
     const [response] = await ttsClient.synthesizeSpeech({
       input: { text },
       voice: { languageCode, name: voiceName },
-      audioConfig: { audioEncoding: 'MP3' },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: 1.1,  // 少し速めで会話的に
+        pitch: 0.0,         // 自然な高さ（0.0がデフォルト）
+      },
     });
 
     const audioContent = response.audioContent
