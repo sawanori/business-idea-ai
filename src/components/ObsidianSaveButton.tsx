@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName, processWithKeywordLinks } from '@/lib/obsidian';
 import { ObsidianPreviewModal } from './ObsidianPreviewModal';
+import type { SummarizeRequest, SummarizeResponse } from '@/types/api';
 
 interface ObsidianSaveButtonProps {
   content: string;
@@ -32,7 +33,61 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
   const [saveType, setSaveType] = useState<'obsidian' | 'download'>('obsidian');
   const [isContentTooLong, setIsContentTooLong] = useState(false);
 
+  // 要約機能用の状態
+  const [showSummarizeOption, setShowSummarizeOption] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+
   const vault = vaultName || getDefaultVaultName();
+
+  // URI長チェック: コンテンツが長すぎてObsidianに保存できないか判定
+  const checkIfContentNeedsSummarization = (content: string): boolean => {
+    const date = new Date().toISOString().split('T')[0];
+    const fullFileName = `${fileName}-${date}.md`;
+    const testResult = generateObsidianUri(vault, fullFileName, content);
+    return testResult.truncated;
+  };
+
+  // 要約処理
+  const handleSummarize = async () => {
+    setIsSummarizing(true);
+    setMessage({ text: '会話を要約中...', type: null });
+    setShowSummarizeOption(false);
+
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content,
+          maxLength: 1000,
+        } satisfies SummarizeRequest),
+      });
+
+      if (!response.ok) {
+        throw new Error('要約に失敗しました');
+      }
+
+      const data: SummarizeResponse = await response.json();
+
+      // 重要: キーワード抽出APIは呼ばない（要約時に既にリンク付き）
+      setProcessedContent(data.summary);
+      setSaveType('obsidian');
+      setIsContentTooLong(false); // 要約されたので長さ問題は解決
+      setIsPreviewOpen(true);
+      setMessage(null);
+
+    } catch (error) {
+      // エラー時のフォールバックオプション表示
+      setMessage({
+        text: error instanceof Error ? error.message : '要約に失敗しました',
+        type: 'error',
+      });
+      // エラー時は要約なしでダウンロードを提案
+      setShowOptions(true);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   // 共通のコンテンツ準備処理
   const handlePrepareContent = async (type: 'obsidian' | 'download') => {
@@ -48,6 +103,21 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
       setMessage({ text: 'Vault名が設定されていません', type: 'error' });
       setShowOptions(true);
       return;
+    }
+
+    // Obsidian保存の場合、コンテンツ長をチェック
+    if (type === 'obsidian') {
+      const needsSummarization = checkIfContentNeedsSummarization(content);
+
+      if (needsSummarization) {
+        // 要約確認ダイアログを表示
+        setShowSummarizeOption(true);
+        setMessage({
+          text: `コンテンツが長すぎてObsidianに直接保存できません（${content.length}文字）`,
+          type: 'warning',
+        });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -212,6 +282,38 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
                 className="overflow-hidden"
               >
                 <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                  {/* 新規追加: AI要約ボタン */}
+                  <button
+                    onClick={handleSummarize}
+                    disabled={isEmpty || isSummarizing}
+                    className={`
+                      w-full px-4 py-2 rounded-md font-medium text-sm
+                      transition-colors
+                      ${isEmpty || isSummarizing
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                      }
+                    `}
+                  >
+                    {isSummarizing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <motion.div
+                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        />
+                        要約中...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                        </svg>
+                        AIで要約して保存
+                      </span>
+                    )}
+                  </button>
+
                   <button
                     onClick={handleDownloadMarkdown}
                     disabled={isEmpty}
@@ -266,6 +368,49 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
                 `}
               >
                 {message.text}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 要約確認ダイアログ */}
+          <AnimatePresence>
+            {showSummarizeOption && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3"
+              >
+                <p className="text-sm text-yellow-800 font-medium">
+                  コンテンツが長いため、Obsidianに直接保存できません。
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSummarize}
+                    disabled={isSummarizing}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {isSummarizing ? '要約中...' : 'AIで要約して保存'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSummarizeOption(false);
+                      handleDownloadMarkdown();
+                    }}
+                    className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+                  >
+                    ダウンロード
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowSummarizeOption(false);
+                      setMessage(null);
+                    }}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium"
+                  >
+                    キャンセル
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

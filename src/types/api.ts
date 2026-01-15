@@ -44,6 +44,18 @@ export interface ExtractKeywordsResponse {
   processedContent: string;
 }
 
+// Summarize API
+export interface SummarizeRequest {
+  content: string;
+  maxLength?: number; // デフォルト: 1000文字
+}
+
+export interface SummarizeResponse {
+  summary: string;
+  originalLength: number;
+  summaryLength: number;
+}
+
 // Error Response
 export interface ErrorResponse {
   error: string;
