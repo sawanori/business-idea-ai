@@ -35,6 +35,15 @@ export interface TTSResponse {
   audioContent: string; // base64 MP3
 }
 
+// Extract Keywords API
+export interface ExtractKeywordsRequest {
+  content: string;
+}
+
+export interface ExtractKeywordsResponse {
+  processedContent: string;
+}
+
 // Error Response
 export interface ErrorResponse {
   error: string;

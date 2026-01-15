@@ -83,3 +83,35 @@ export const getDefaultVaultName = (): string => {
   if (typeof window === 'undefined') return '';
   return process.env.NEXT_PUBLIC_OBSIDIAN_VAULT_NAME || '';
 };
+
+/**
+ * AIを使って会話内容から重要なキーワードを抽出し、[[リンク]]を付ける
+ * @param content 元のMarkdown内容
+ * @returns [[キーワード]]形式のリンクが付いたMarkdown
+ */
+export async function processWithKeywordLinks(content: string): Promise<string> {
+  if (!content.trim()) {
+    return content;
+  }
+
+  try {
+    const response = await fetch('/api/extract-keywords', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to process keywords:', response.statusText);
+      // エラー時は元のコンテンツをそのまま返す（フォールバック）
+      return content;
+    }
+
+    const data = await response.json();
+    return data.processedContent;
+  } catch (error) {
+    console.error('Error processing keywords:', error);
+    // エラー時は元のコンテンツをそのまま返す（フォールバック）
+    return content;
+  }
+}

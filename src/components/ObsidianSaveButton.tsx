@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName } from '@/lib/obsidian';
+import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName, processWithKeywordLinks } from '@/lib/obsidian';
 
 interface ObsidianSaveButtonProps {
   content: string;
@@ -40,12 +40,16 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     }
 
     setIsSaving(true);
-    setMessage(null);
+    setMessage({ text: 'キーワードを抽出中...', type: null });
 
     try {
+      // ステップ1: キーワードリンク処理
+      const processedContent = await processWithKeywordLinks(content);
+
+      // ステップ2: Obsidian URI生成と保存
       const date = new Date().toISOString().split('T')[0];
       const fullFileName = `${fileName}-${date}.md`;
-      const result = generateObsidianUri(vault, fullFileName, content);
+      const result = generateObsidianUri(vault, fullFileName, processedContent);
 
       if (result.truncated) {
         setMessage({
@@ -68,16 +72,19 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
     }
   };
 
-  const handleDownloadMarkdown = () => {
+  const handleDownloadMarkdown = async () => {
     if (!content.trim()) {
       setMessage({ text: 'ダウンロードする内容がありません', type: 'error' });
       return;
     }
 
     try {
+      // キーワードリンク処理を追加
+      const processedContent = await processWithKeywordLinks(content);
+
       const date = new Date().toISOString().split('T')[0];
       const fullFileName = `${fileName}-${date}`;
-      downloadAsMarkdown(fullFileName, content);
+      downloadAsMarkdown(fullFileName, processedContent);
       setMessage({ text: 'ダウンロードしました', type: 'success' });
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
@@ -231,6 +238,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
               ${message.type === 'success' && 'bg-green-100 text-green-800'}
               ${message.type === 'warning' && 'bg-yellow-100 text-yellow-800'}
               ${message.type === 'error' && 'bg-red-100 text-red-800'}
+              ${message.type === null && 'bg-blue-100 text-blue-800'}
             `}
           >
             {message.text}
