@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName, processWithKeywordLinks } from '@/lib/obsidian';
 import { ObsidianPreviewModal } from './ObsidianPreviewModal';
@@ -36,6 +36,9 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
   // 要約機能用の状態
   const [showSummarizeOption, setShowSummarizeOption] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+
+  // 処理中フラグ（二重クリック防止）
+  const isProcessingRef = useRef(false);
 
   const vault = vaultName || getDefaultVaultName();
 
@@ -90,7 +93,15 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
   };
 
   // 共通のコンテンツ準備処理
-  const handlePrepareContent = async (type: 'obsidian' | 'download') => {
+  const handlePrepareContent = useCallback(async (type: 'obsidian' | 'download') => {
+    // 二重処理防止
+    if (isProcessingRef.current) {
+      console.log('ObsidianSaveButton: Already processing, ignoring');
+      return;
+    }
+
+    console.log('ObsidianSaveButton: handlePrepareContent started', { type, contentLength: content.length });
+
     if (!content.trim()) {
       setMessage({
         text: type === 'obsidian' ? '保存する内容がありません' : 'ダウンロードする内容がありません',
@@ -120,6 +131,8 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
       }
     }
 
+    // 処理開始
+    isProcessingRef.current = true;
     setIsSaving(true);
     setSaveType(type);
     setMessage({ text: 'キーワードを抽出中...', type: null });
@@ -137,7 +150,7 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
         ]);
       } catch {
         // キーワード処理が失敗またはタイムアウトした場合、元のコンテンツを使用
-        console.log('キーワード処理をスキップ、元のコンテンツを使用');
+        console.log('ObsidianSaveButton: キーワード処理をスキップ、元のコンテンツを使用');
         processed = content;
       }
 
@@ -153,34 +166,53 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
         setIsContentTooLong(false);
       }
 
+      console.log('ObsidianSaveButton: Opening preview modal');
       setIsPreviewOpen(true);
       setMessage(null);
     } catch (err) {
       // それでも失敗した場合、元のコンテンツでモーダルを表示
-      console.error('保存準備エラー:', err);
+      console.error('ObsidianSaveButton: 保存準備エラー:', err);
       setProcessedContent(content);
       setIsContentTooLong(false);
       setIsPreviewOpen(true);
       setMessage(null);
     } finally {
       setIsSaving(false);
+      isProcessingRef.current = false;
     }
-  };
+  }, [content, vault, fileName]);
 
-  const handleSaveToObsidian = () => {
+  const handleSaveToObsidian = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
+    // イベントのデフォルト動作を防止
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    const isContentEmpty = !content.trim();
+
     console.log('ObsidianSaveButton: handleSaveToObsidian called', {
-      isEmpty,
+      isEmpty: isContentEmpty,
       disabled,
       isSaving,
-      contentLength: content.length
+      isProcessing: isProcessingRef.current,
+      contentLength: content.length,
+      eventType: e?.type
     });
-    handlePrepareContent('obsidian');
-  };
 
-  const handleDownloadMarkdown = () => {
+    // 早期リターンチェック
+    if (isContentEmpty || disabled || isSaving || isProcessingRef.current) {
+      console.log('ObsidianSaveButton: Early return due to state check');
+      return;
+    }
+
+    handlePrepareContent('obsidian');
+  }, [content, disabled, isSaving, handlePrepareContent]);
+
+  const handleDownloadMarkdown = useCallback(() => {
     console.log('ObsidianSaveButton: handleDownloadMarkdown called');
     handlePrepareContent('download');
-  };
+  }, [handlePrepareContent]);
 
   // モーダルの保存ボタン押下時の処理
   const handleConfirmSave = () => {
@@ -227,18 +259,22 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
       {compact ? (
         <button
           onClick={handleSaveToObsidian}
-          disabled={disabled || isEmpty || isSaving}
+          onTouchEnd={handleSaveToObsidian}
+          disabled={disabled || isEmpty || isSaving || isProcessingRef.current}
           className={`
             p-3 rounded-lg transition-colors min-w-[44px] min-h-[44px]
-            flex items-center justify-center
+            flex items-center justify-center select-none
+            touch-manipulation
             ${isEmpty || disabled
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+              : 'bg-purple-100 text-purple-600 hover:bg-purple-200 active:bg-purple-300'
             }
           `}
           aria-label="Obsidianに保存"
           title={isEmpty ? '保存する内容がありません' : 'Obsidianに保存'}
           data-compact="true"
+          type="button"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
         >
           {isSaving ? (
             <motion.div
