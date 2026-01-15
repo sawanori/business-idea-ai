@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateObsidianUri, openObsidianUri, downloadAsMarkdown, getDefaultVaultName, processWithKeywordLinks } from '@/lib/obsidian';
+import { ObsidianPreviewModal } from './ObsidianPreviewModal';
 
 interface ObsidianSaveButtonProps {
   content: string;
@@ -25,28 +26,76 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: MessageType } | null>(null);
 
+  // プレビューモーダル用の状態
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [processedContent, setProcessedContent] = useState('');
+  const [saveType, setSaveType] = useState<'obsidian' | 'download'>('obsidian');
+  const [isContentTooLong, setIsContentTooLong] = useState(false);
+
   const vault = vaultName || getDefaultVaultName();
 
-  const handleSaveToObsidian = async () => {
+  // 共通のコンテンツ準備処理
+  const handlePrepareContent = async (type: 'obsidian' | 'download') => {
     if (!content.trim()) {
-      setMessage({ text: '保存する内容がありません', type: 'error' });
+      setMessage({
+        text: type === 'obsidian' ? '保存する内容がありません' : 'ダウンロードする内容がありません',
+        type: 'error'
+      });
       return;
     }
 
-    if (!vault) {
+    if (type === 'obsidian' && !vault) {
       setMessage({ text: 'Vault名が設定されていません', type: 'error' });
       setShowOptions(true);
       return;
     }
 
     setIsSaving(true);
+    setSaveType(type);
     setMessage({ text: 'キーワードを抽出中...', type: null });
 
     try {
-      // ステップ1: キーワードリンク処理
-      const processedContent = await processWithKeywordLinks(content);
+      const processed = await processWithKeywordLinks(content);
+      setProcessedContent(processed);
 
-      // ステップ2: Obsidian URI生成と保存
+      if (type === 'obsidian') {
+        // URI長チェック
+        const date = new Date().toISOString().split('T')[0];
+        const fullFileName = `${fileName}-${date}.md`;
+        const result = generateObsidianUri(vault, fullFileName, processed);
+        setIsContentTooLong(result.truncated);
+      } else {
+        setIsContentTooLong(false);
+      }
+
+      setIsPreviewOpen(true);
+      setMessage(null);
+    } catch (err) {
+      setMessage({
+        text: err instanceof Error ? err.message : 'キーワード処理に失敗しました',
+        type: 'error',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveToObsidian = () => handlePrepareContent('obsidian');
+  const handleDownloadMarkdown = () => handlePrepareContent('download');
+
+  // モーダルの保存ボタン押下時の処理
+  const handleConfirmSave = () => {
+    setIsPreviewOpen(false);
+
+    if (saveType === 'download') {
+      // ダウンロード処理
+      const date = new Date().toISOString().split('T')[0];
+      const fullFileName = `${fileName}-${date}`;
+      downloadAsMarkdown(fullFileName, processedContent);
+      setMessage({ text: 'ダウンロードしました', type: 'success' });
+      setTimeout(() => setMessage(null), 3000);
+    } else {
+      // Obsidian保存処理
       const date = new Date().toISOString().split('T')[0];
       const fullFileName = `${fileName}-${date}.md`;
       const result = generateObsidianUri(vault, fullFileName, processedContent);
@@ -62,37 +111,13 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
         setMessage({ text: 'Obsidianで開きました', type: 'success' });
         setTimeout(() => setMessage(null), 3000);
       }
-    } catch (err) {
-      setMessage({
-        text: err instanceof Error ? err.message : '保存に失敗しました',
-        type: 'error',
-      });
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const handleDownloadMarkdown = async () => {
-    if (!content.trim()) {
-      setMessage({ text: 'ダウンロードする内容がありません', type: 'error' });
-      return;
-    }
-
-    try {
-      // キーワードリンク処理を追加
-      const processedContent = await processWithKeywordLinks(content);
-
-      const date = new Date().toISOString().split('T')[0];
-      const fullFileName = `${fileName}-${date}`;
-      downloadAsMarkdown(fullFileName, processedContent);
-      setMessage({ text: 'ダウンロードしました', type: 'success' });
-      setTimeout(() => setMessage(null), 3000);
-    } catch (err) {
-      setMessage({
-        text: err instanceof Error ? err.message : 'ダウンロードに失敗しました',
-        type: 'error',
-      });
-    }
+  // モーダルのキャンセルボタン押下時の処理
+  const handleCancelPreview = () => {
+    setIsPreviewOpen(false);
+    setProcessedContent('');
   };
 
   const isEmpty = !content.trim();
@@ -245,6 +270,17 @@ export const ObsidianSaveButton: React.FC<ObsidianSaveButtonProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* プレビューモーダル */}
+      <ObsidianPreviewModal
+        isOpen={isPreviewOpen}
+        content={processedContent}
+        onConfirm={handleConfirmSave}
+        onCancel={handleCancelPreview}
+        isSaving={false}
+        isContentTooLong={isContentTooLong}
+        saveType={saveType}
+      />
     </div>
   );
 };
