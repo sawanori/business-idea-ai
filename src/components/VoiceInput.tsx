@@ -63,7 +63,10 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
   return (
     <div className="flex flex-col items-center gap-3">
       <motion.button
-        onMouseDown={handleStartRecording}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          handleStartRecording();
+        }}
         onMouseUp={handleStopRecording}
         onMouseLeave={handleStopRecording}
         onTouchStart={(e) => {
@@ -75,10 +78,16 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({ onTranscript, disabled =
           handleStopRecording();
         }}
         onTouchCancel={handleStopRecording}
+        onContextMenu={(e) => {
+          e.preventDefault();
+        }}
+        draggable={false}
         disabled={disabled || isProcessing}
+        style={{ WebkitTouchCallout: 'none' }}
         className={`
           relative w-20 h-20 rounded-full flex items-center justify-center
           transition-all duration-300 shadow-lg
+          select-none
           ${isRecording
             ? 'bg-red-500 hover:bg-red-600'
             : 'bg-gradient-to-br from-orange-400 to-orange-600 hover:from-orange-500 hover:to-orange-700'
