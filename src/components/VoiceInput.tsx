@@ -45,8 +45,8 @@ export const VoiceInput = forwardRef<VoiceInputHandle, VoiceInputProps>(
   };
 
   const handleStopRecording = async () => {
-    // Guard clause: only process if currently recording and not disabled
-    if (disabled || !isRecording) return;
+    // Guard clause: only process if not disabled
+    if (disabled) return;
 
     setIsProcessing(true);
     try {
