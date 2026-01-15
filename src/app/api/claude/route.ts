@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const response = await client.messages.create({
-      model: process.env.CLAUDE_MODEL || 'claude-sonnet-4-20250514',
+      model: process.env.CLAUDE_MODEL || 'claude-opus-4-5-20251101',
       max_tokens: parseInt(process.env.CLAUDE_MAX_TOKENS || '2048'),
       system: SYSTEM_PROMPT,
       messages: messages.map(msg => ({

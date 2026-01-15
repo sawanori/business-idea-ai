@@ -286,7 +286,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 NEXT_PUBLIC_OBSIDIAN_VAULT_NAME=MyVault
 
 # Claude API設定（オプション）
-CLAUDE_MODEL=claude-sonnet-4-20250514
+CLAUDE_MODEL=claude-opus-4-5-20251101
 CLAUDE_MAX_TOKENS=2048
 
 # Google TTS設定（オプション）
