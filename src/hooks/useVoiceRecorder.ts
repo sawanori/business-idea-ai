@@ -27,6 +27,7 @@ interface UseVoiceRecorderReturn {
   mimeType: string;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<{ blob: Blob; mimeType: string } | null>;
+  releaseStream: () => void;
   error: string | null;
 }
 
@@ -49,21 +50,57 @@ export const useVoiceRecorder = (
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
+    // ストリーム解放を削除（再利用のため保持）
     mediaRecorderRef.current = null;
     chunksRef.current = [];
   }, []);
+
+  const getOrCreateStream = useCallback(async (): Promise<MediaStream> => {
+    // 既存のアクティブなストリームがあれば再利用
+    if (streamRef.current && streamRef.current.active) {
+      return streamRef.current;
+    }
+
+    // 新規取得
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    streamRef.current = stream;
+    return stream;
+  }, []);
+
+  const stopRecording = useCallback((): Promise<{ blob: Blob; mimeType: string } | null> => {
+    return new Promise((resolve) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      const mediaRecorder = mediaRecorderRef.current;
+      if (!mediaRecorder || mediaRecorder.state !== 'recording') {
+        resolve(null);
+        return;
+      }
+
+      mediaRecorder.onstop = () => {
+        const currentMimeType = mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: currentMimeType });
+        
+        // ストリーム解放を削除（再利用のため保持）
+        chunksRef.current = [];
+        mediaRecorderRef.current = null;
+        resolve({ blob, mimeType: currentMimeType });
+      };
+
+      mediaRecorder.stop();
+      setIsRecording(false);
+    });
+  }, [mimeType]);
 
   const startRecording = useCallback(async () => {
     try {
       setError(null);
       cleanup();
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const stream = await getOrCreateStream();
       
       const detectedMimeType = getSupportedMimeType();
       setMimeType(detectedMimeType);
@@ -92,39 +129,14 @@ export const useVoiceRecorder = (
       setError(message);
       cleanup();
     }
-  }, [cleanup, maxDuration, onTimeout]);
+  }, [cleanup, getOrCreateStream, maxDuration, onTimeout, stopRecording]);
 
-  const stopRecording = useCallback((): Promise<{ blob: Blob; mimeType: string } | null> => {
-    return new Promise((resolve) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+  const releaseStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
 
-      const mediaRecorder = mediaRecorderRef.current;
-      if (!mediaRecorder || mediaRecorder.state !== 'recording') {
-        resolve(null);
-        return;
-      }
-
-      mediaRecorder.onstop = () => {
-        const currentMimeType = mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type: currentMimeType });
-        
-        // ストリームを停止
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
-          streamRef.current = null;
-        }
-        
-        chunksRef.current = [];
-        resolve({ blob, mimeType: currentMimeType });
-      };
-
-      mediaRecorder.stop();
-      setIsRecording(false);
-    });
-  }, [mimeType]);
-
-  return { isRecording, mimeType, startRecording, stopRecording, error };
+  return { isRecording, mimeType, startRecording, stopRecording, releaseStream, error };
 };
